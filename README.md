@@ -17,12 +17,16 @@ All of the modern iOS tools. Unified.
 
 #### pip
 `pip install git+https://git.jacoblightning3.xyz/jacoblightning3/iphonetool.git@master`
+
 or from	the mirror:
+
 `pip install git+https://github.com/Jacoblightning/iphonetool.git@master`
 
 #### uv
 `uv tool install https://git.jacoblightning3.xyz/jacoblightning3/iphonetool.git`
+
 or from the mirror:
+
 `uv tool install https://github.com/Jacoblightning/iphonetool.git`
 
 ## Usage
