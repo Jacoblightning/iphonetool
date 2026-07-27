@@ -86,12 +86,19 @@ def usbliter8_download(dev: usb.core.Device, data: bytes) -> True:
     send_usbliter8_command(dev, Usbliter8Command.DFU_DNLOAD, None, 100)
 
 def linux_remote_boot(m1n1_blob: pathlib.Path, monitor_stub: Optional[pathlib.Path]):
-    raise NotImplementedError()
+    subprocess.check_call(["./remote_boot/remoteboot.sh", "build"])
+    if monitor_stub is not None:
+        subprocess.check_call(["./remote_boot/remoteboot.sh", "boot", m1n1_blob, monitor_stub])
+    else:
+        subprocess.check_call(["./remote_boot/remoteboot.sh", "boot", m1n1_blob])
+
 
 async def main_real(dev: usb.core.Device, pwned: bool, serial: str, action: str, args: dict) -> int:
     ecid = int(helpers.serial_info(serial, "ECID"), 16)
 
     irecovery = subprocess.check_output(["irecovery", "-q", "-i", hex(ecid)]).decode()
+
+    print(args)
 
     match action:
         case "info":
@@ -121,22 +128,33 @@ async def main_real(dev: usb.core.Device, pwned: bool, serial: str, action: str,
                     send_usbliter8_command(dev, Usbliter8Command.DFU_ABORT, None, 100)
                 case "remote":
                     linux_remote_boot(args["m1n1"], args.get("monitor"))
-                case "linux":
-                    with tempfile.NamedTemporaryFile() as m1n1_blob_file:
-                        with args["m1n1"].open("rb") as f:
+        case "linux":
+            print("Preapring iboot...")
+            with tempfile.NamedTemporaryFile() as m1n1_blob_file:
+                print("adding m1n1")
+                with args["m1n1"].open("rb") as f:
+                    shutil.copyfileobj(f, m1n1_blob_file)
+                if args["commandline"] is not None:
+                    print("adding commandline")
+                    m1n1_blob_file.write(args["commandline"].encode())
+                if args["dtb"] is not None:
+                    if not args["dtb"].is_file():
+                        raise ValueError("Specified DTB is not a file.")
+                    print("adding dtb")
+                    with args["dtb"].open("rb") as f:
+                        shutil.copyfileobj(f, m1n1_blob_file)
+                else:
+                    if not args["dtbs"].is_dir():
+                        raise ValueError("Specified DTB directory is not a dir.")
+                    print("adding dtbs")
+                    for dtb in glob.iglob("./*.dtb", root_dir=args["dtbs"]):
+                        with (args["dtbs"] / dtb).open("rb") as f:
                             shutil.copyfileobj(f, m1n1_blob_file)
-                        if "commandline" in args:
-                            m1n1_blob_file.write(args["commandline"].encode())
-                        if "dtb" in args:
-                            with args["dtb"].open("rb") as f:
-                                shutil.copyfileobj(f, m1n1_blob_file)
-                        else:
-                            for dtb in glob.iglob("./*.dtb", root_dir=args["dtbs"]):
-                                with (args["dtbs"] / dtb).open("rb") as f:
-                                    shutil.copyfileobj(f, m1n1_blob_file)
-                        with args["kernel"].open("rb") as f:
-                            shutil.copyfileobj(f, m1n1_blob_file)
-                        if "initramfs" in args:
-                            with args["initramfs"].open("rb") as f:
-                                shutil.copyfileobj(f, m1n1_blob_file)
-                        linux_remote_boot(pathlib.Path(m1n1_blob_file.name), args.get("monitor"))
+                print("adding kernel")
+                with args["kernel"].open("rb") as f:
+                    shutil.copyfileobj(f, m1n1_blob_file)
+                if args["initramfs"] is not None:
+                    print("adding initramfs")
+                    with args["initramfs"].open("rb") as f:
+                        shutil.copyfileobj(f, m1n1_blob_file)
+                linux_remote_boot(pathlib.Path(m1n1_blob_file.name), args.get("monitor"))
