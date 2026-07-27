@@ -84,4 +84,6 @@ def irecovery_command(cmd: str, ecid: Optional[int] = None) -> None:
 
 
 def base_directory() -> pathlib.Path:
-    return pathlib.Path(__file__).parent
+    script_dir = pathlib.Path(__file__).parent
+    base_dir = script_dir.parent.parent
+    return base_dir
