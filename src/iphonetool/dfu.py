@@ -12,8 +12,19 @@ from typing import Any, Optional
 
 import usb.core
 
-from . import config
-from . import helpers
+try:
+    from . import config
+    from . import helpers
+except ImportError:
+    try:
+        import config
+        import helpers
+    except ImportError:
+        try:
+            from iphonetool import config
+            from iphonetool import helpers
+        except ImportError:
+            raise ImportError("Could not import needed modules")
 
 
 async def main(

@@ -7,7 +7,16 @@ from typing import Optional
 
 import usb.core
 
-from .config import APPLE_VENDORID, AppleProductId
+try:
+    from .config import APPLE_VENDORID, AppleProductId
+except ImportError:
+    try:
+        from config import APPLE_VENDORID, AppleProductId
+    except ImportError:
+        try:
+            from iphonetool.config import APPLE_VENDORID, AppleProductId
+        except ImportError:
+            raise ImportError("Could not import needed modules")
 
 
 class DeviceMode(Enum):
