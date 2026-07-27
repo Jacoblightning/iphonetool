@@ -4,6 +4,7 @@ import asyncio
 from enum import Enum, auto
 import functools
 import subprocess
+import pathlib
 
 from config import APPLE_VENDORID, AppleProductId
 
@@ -69,3 +70,6 @@ def irecovery_command(cmd: str, ecid: Optional[int] = None) -> None:
         subprocess.run(["irecovery", "-i", hex(ecid), "-c", cmd], check=True)
     else:
         subprocess.run(["irecovery", "-c", cmd], check=True)
+
+def base_directory() -> pathlib.Path:
+    return pathlib.Path(__file__).parent

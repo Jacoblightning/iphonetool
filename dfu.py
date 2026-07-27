@@ -7,8 +7,10 @@ import pathlib
 import subprocess
 import argparse
 import config
+import sys
 import tempfile
 import shutil
+import os
 import glob
 
 from typing import Any, Optional
@@ -79,7 +81,7 @@ def usbliter8_download(dev: usb.core.Device, data: bytes) -> True:
         offset += current_block_length
         left   -= current_block_length
 
-        print("\rUploaded: 0x{offset:x}/0x{len(data):x} bytes.", end="")
+        print(f"\rUploaded: 0x{offset:x}/0x{len(data):x} bytes.", end="")
 
     print()
 
@@ -88,9 +90,9 @@ def usbliter8_download(dev: usb.core.Device, data: bytes) -> True:
 def linux_remote_boot(m1n1_blob: pathlib.Path, monitor_stub: Optional[pathlib.Path]):
     subprocess.check_call(["./remote_boot/remoteboot.sh", "build"])
     if monitor_stub is not None:
-        subprocess.check_call(["./remote_boot/remoteboot.sh", "boot", m1n1_blob, monitor_stub])
+        subprocess.check_call([helpers.base_directory() / "./remote_boot/remoteboot.sh", "boot", m1n1_blob, monitor_stub], env={"USBLITER8CTL":helpers.base_directory()/"usbliter8ctl.py", "PYTHON":sys.executable, "HOME":os.getenv("HOME")})
     else:
-        subprocess.check_call(["./remote_boot/remoteboot.sh", "boot", m1n1_blob])
+        subprocess.check_call(["./remote_boot/remoteboot.sh", "boot", m1n1_blob], env={"USBLITER8CTL":helpers.base_directory()/"usbliter8ctl.py", "PYTHON":sys.executable, "HOME":os.getenv("HOME")})
 
 
 async def main_real(dev: usb.core.Device, pwned: bool, serial: str, action: str, args: dict) -> int:
@@ -130,13 +132,13 @@ async def main_real(dev: usb.core.Device, pwned: bool, serial: str, action: str,
                     linux_remote_boot(args["m1n1"], args.get("monitor"))
         case "linux":
             print("Preapring iboot...")
-            with tempfile.NamedTemporaryFile() as m1n1_blob_file:
+            with tempfile.NamedTemporaryFile(mode="wb") as m1n1_blob_file:
                 print("adding m1n1")
                 with args["m1n1"].open("rb") as f:
                     shutil.copyfileobj(f, m1n1_blob_file)
                 if args["commandline"] is not None:
                     print("adding commandline")
-                    m1n1_blob_file.write(args["commandline"].encode())
+                    m1n1_blob_file.write(f'chosen.bootargs={args["commandline"]}\n'.encode())
                 if args["dtb"] is not None:
                     if not args["dtb"].is_file():
                         raise ValueError("Specified DTB is not a file.")
