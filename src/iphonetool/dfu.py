@@ -65,8 +65,7 @@ async def main(
         boot_remote_parser.add_argument(
             "-m", "--monitor", type=pathlib.Path, help="m1n1 monitor stub"
         )
-
-        subparsers.add_parser("linux_prep", help="Run this once per-device before booting linux on it")
+        boot_remote_parser.add_argument("--remoteboot", type=pathlib.Path, help="Path to remoteboot.sh", required=True)
 
         # High-level linux booter
         linux_parser = subparsers.add_parser("linux", help="Boot linux on device")
@@ -98,6 +97,7 @@ async def main(
         linux_parser.add_argument(
             "-m", "--monitor", type=pathlib.Path, help="m1n1 monitor stub"
         )
+        linux_parser.add_argument("--remoteboot", type=pathlib.Path, help="Path to remoteboot.sh", required=True)
 
     args = parser.parse_args()
 
@@ -141,12 +141,11 @@ def usbliter8_download(dev: usb.core.Device, data: bytes) -> True:
     send_usbliter8_command(dev, Usbliter8Command.DFU_DNLOAD, None, 100)
 
 
-def linux_remote_boot(m1n1_blob: pathlib.Path, monitor_stub: Optional[pathlib.Path]):
-    subprocess.check_call(["./remote_boot/remoteboot.sh", "build"])
+def linux_remote_boot(m1n1_blob: pathlib.Path, monitor_stub: Optional[pathlib.Path], remoteboot: pathlib.Path):
     if monitor_stub is not None:
         subprocess.check_call(
             [
-                helpers.base_directory() / "./remote_boot/remoteboot.sh",
+                "bash", remoteboot,
                 "boot",
                 m1n1_blob,
                 monitor_stub,
@@ -159,7 +158,7 @@ def linux_remote_boot(m1n1_blob: pathlib.Path, monitor_stub: Optional[pathlib.Pa
         )
     else:
         subprocess.check_call(
-            [helpers.base_directory() / "./remote_boot/remoteboot.sh", "boot", m1n1_blob],
+            ["bash", remoteboot, "boot", m1n1_blob],
             env={
                 "USBLITER8CTL": helpers.base_directory() / "usbliter8ctl.py",
                 "PYTHON": sys.executable,
@@ -167,6 +166,19 @@ def linux_remote_boot(m1n1_blob: pathlib.Path, monitor_stub: Optional[pathlib.Pa
             },
         )
 
+def linux_prep():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("remoteboot", type=pathlib.Path, help="Path to remoteboot.sh")
+
+    args = parser.parse_args()
+
+    subprocess.check_call(
+        ["bash", args.remoteboot, "build"]
+    )
+    subprocess.check_call(
+        ["sudo", "bash", args.remoteboot, "prep"]
+    )
+    print("You can now boot linux on your device")
 
 async def main_real(
     dev: usb.core.Device, pwned: bool, serial: str, action: str, args: dict
@@ -206,15 +218,7 @@ async def main_real(
                     send_usbliter8_command(dev, Usbliter8Command.CUSTOM_BOOT, None, 100)
                     send_usbliter8_command(dev, Usbliter8Command.DFU_ABORT, None, 100)
                 case "remote":
-                    linux_remote_boot(args["m1n1"], args.get("monitor"))
-        case "linux_prep":
-            subprocess.check_call(
-                [helpers.base_directory() / "./remote_boot/remoteboot.sh", "build"]
-            )
-            subprocess.check_call(
-                [helpers.base_directory() / "./remote_boot/remoteboot.sh", "prep"]
-            )
-            print("You can now boot linux on your device")
+                    linux_remote_boot(args["m1n1"], args.get("monitor"), args["remoteboot"])
         case "linux":
             print("Preapring iboot...")
             with tempfile.NamedTemporaryFile(mode="wb") as m1n1_blob_file:
@@ -247,5 +251,7 @@ async def main_real(
                     with args["initramfs"].open("rb") as f:
                         shutil.copyfileobj(f, m1n1_blob_file)
                 linux_remote_boot(
-                    pathlib.Path(m1n1_blob_file.name), args.get("monitor")
+                    pathlib.Path(m1n1_blob_file.name), args.get("monitor"), args["remoteboot"]
                 )
+
+    return 0

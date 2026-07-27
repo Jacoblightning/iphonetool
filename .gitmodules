@@ -1,4 +1,0 @@
-[submodule "remote_boot"]
-	path = src/iphonetool/remote_boot
-	url = https://github.com/yhavry/remote_boot.git
-	branch = d421-a12-a13-postpwned-prep

@@ -29,6 +29,10 @@ or from the mirror:
 
 `uv tool install https://github.com/Jacoblightning/iphonetool.git`
 
+## Prerequisites
+
+Before you can run linux (or remote boot) on a phone, you must run `iphonetool-linuxprep`
+
 ## Usage
 
 - Run `iphonetool.py info` to give info on connected devices
