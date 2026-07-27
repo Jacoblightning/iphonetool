@@ -561,7 +561,7 @@ wheels = [
 [[package]]
 name = "iphonetool"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "pymobiledevice3" },
     { name = "pyusb" },

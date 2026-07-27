@@ -6,8 +6,8 @@ from typing import Optional
 
 import usb.core
 
-import helpers
-import normal
+from . import helpers
+from . import normal
 
 try:
     import pymobiledevice3

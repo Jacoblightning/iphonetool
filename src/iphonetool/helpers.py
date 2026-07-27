@@ -7,7 +7,7 @@ from typing import Optional
 
 import usb.core
 
-from config import APPLE_VENDORID, AppleProductId
+from .config import APPLE_VENDORID, AppleProductId
 
 
 class DeviceMode(Enum):

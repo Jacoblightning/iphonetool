@@ -1,13 +1,25 @@
 [project]
 name = "iphonetool"
 version = "0.1.0"
-description = "Add your description here"
+authors = [
+	{ name="Jacob Freeman", email="t00niyf5@duck.com" },
+]
+description = "All of the modern iOS tools. Unified"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 dependencies = [
     "pymobiledevice3>=10.1.0",
     "pyusb>=1.3.1",
 ]
+
+[build-system]
+requires = ["uv_build >= 0.11.23, <0.12.0"]
+build-backend = "uv_build"
+
+[project.scripts]
+iphonetool = "iphonetool.__main__:runmain"
 
 [dependency-groups]
 dev = [

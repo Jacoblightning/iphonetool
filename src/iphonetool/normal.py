@@ -3,8 +3,8 @@ import asyncio
 
 import usb.core
 
-import helpers
-import recovery
+from . import helpers
+from . import recovery
 
 try:
     import pymobiledevice3.exceptions

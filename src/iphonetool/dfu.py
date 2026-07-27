@@ -12,8 +12,8 @@ from typing import Any, Optional
 
 import usb.core
 
-import config
-import helpers
+from . import config
+from . import helpers
 
 
 async def main(
@@ -172,8 +172,6 @@ async def main_real(
     ecid = int(helpers.serial_info(serial, "ECID"), 16)
 
     irecovery = subprocess.check_output(["irecovery", "-q", "-i", hex(ecid)]).decode()
-
-    print(args)
 
     match action:
         case "info":

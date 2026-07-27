@@ -17,10 +17,7 @@ import asyncio
 import sys
 from enum import IntEnum
 
-import dfu
-import helpers
-import normal
-import recovery
+from . import dfu, helpers, normal, recovery
 
 
 async def main() -> int:
@@ -41,9 +38,9 @@ async def main() -> int:
     parser.add_argument(
         "-w", "--wait", help="Wait for a device to appear", action="store_true"
     )
-    subparsers = parser.add_subparsers(dest="action")
+    subparsers = parser.add_subparsers(dest="action", help="What action to run:", required=True)
     # List is supported in all modes
-    subparsers.add_parser("info")
+    subparsers.add_parser("info", help="Print device info")
 
     if dev is None:
         return await normal.main(None, parser, subparsers)
@@ -57,6 +54,8 @@ async def main() -> int:
         case helpers.DeviceMode.DFU:
             return await dfu.main(dev, parser, subparsers)
 
+def runmain() -> int:
+    return asyncio.run(main())
 
 if __name__ == "__main__":
-    exit(asyncio.run(main()))
+    exit(runmain())
