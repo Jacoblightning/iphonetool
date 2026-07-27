@@ -209,8 +209,10 @@ async def main_real(
                     linux_remote_boot(args["m1n1"], args.get("monitor"))
         case "linux_prep":
             subprocess.check_call(
-                [helpers.base_directory() / "./remote_boot/remoteboot.sh", "prep"],
-                env={"HOME": os.getenv("HOME")},
+                [helpers.base_directory() / "./remote_boot/remoteboot.sh", "build"]
+            )
+            subprocess.check_call(
+                [helpers.base_directory() / "./remote_boot/remoteboot.sh", "prep"]
             )
             print("You can now boot linux on your device")
         case "linux":
