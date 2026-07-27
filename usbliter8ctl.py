@@ -11,11 +11,12 @@
 
 import argparse
 import pathlib
+
 import usb
 
-
-from dfu import usbliter8_download, send_usbliter8_command, Usbliter8Command
+from dfu import Usbliter8Command, send_usbliter8_command, usbliter8_download
 from helpers import get_device
+
 
 def do_boot(args, dev):
     usbliter8_download(dev, args.iboot.read_bytes())
@@ -26,6 +27,7 @@ def do_boot(args, dev):
 
 def do_demote(args, dev):
     send_usbliter8_command(dev, Usbliter8Command.CUSTOM_DEMOTE, None, 100)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Love is Control")
@@ -52,7 +54,6 @@ def main():
         raise RuntimeError("this is not Pwned DFU device")
 
     args.func(args, dev)
-
 
 
 if __name__ == "__main__":

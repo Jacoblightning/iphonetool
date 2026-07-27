@@ -13,16 +13,15 @@ except ImportError:
     print("pyusb not installed and is needed for all operations. Please install pyusb")
     raise
 import argparse
-from enum import IntEnum
-import sys
-import argparse
 import asyncio
+import sys
+from enum import IntEnum
 
-import recovery
 import dfu
-import normal
-
 import helpers
+import normal
+import recovery
+
 
 async def main() -> int:
     if "-w" in sys.argv or "--wait" in sys.argv:
@@ -39,7 +38,9 @@ async def main() -> int:
 
     parser = argparse.ArgumentParser()
     # This is only for showing up in help
-    parser.add_argument("-w", "--wait", help="Wait for a device to appear", action="store_true")
+    parser.add_argument(
+        "-w", "--wait", help="Wait for a device to appear", action="store_true"
+    )
     subparsers = parser.add_subparsers(dest="action")
     # List is supported in all modes
     subparsers.add_parser("info")

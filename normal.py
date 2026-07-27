@@ -1,20 +1,26 @@
-import usb.core
-
 import argparse
 import asyncio
 
-import recovery
+import usb.core
 
 import helpers
+import recovery
 
 try:
-    import pymobiledevice3.lockdown
     import pymobiledevice3.exceptions
+    import pymobiledevice3.lockdown
 except ImportError:
-    print("pymobiledevice3 not installed and is needed for normal/recovery mode operation. Please install pymobiledevice3")
+    print(
+        "pymobiledevice3 not installed and is needed for normal/recovery mode operation. Please install pymobiledevice3"
+    )
     raise
 
-async def main(dev: usb.core.Device, parser: argparse.ArgumentParser, subparsers: argparse._SubParsersAction) -> int:
+
+async def main(
+    dev: usb.core.Device,
+    parser: argparse.ArgumentParser,
+    subparsers: argparse._SubParsersAction,
+) -> int:
     subparsers.add_parser("dfu_helper", help="Help put device into DFU mode")
     subparsers.add_parser("enter_recovery", help="Enter recovery mode")
 
@@ -29,9 +35,14 @@ async def main_real(dev: usb.core.Device, action: str) -> int:
 
     while True:
         try:
-            connector = await pymobiledevice3.lockdown.create_using_usbmux(connection_type="USB", serial=serial)
+            connector = await pymobiledevice3.lockdown.create_using_usbmux(
+                connection_type="USB", serial=serial
+            )
             break
-        except (pymobiledevice3.exceptions.DeviceNotFoundError, pymobiledevice3.exceptions.ConnectionFailedToUsbmuxdError):
+        except (
+            pymobiledevice3.exceptions.DeviceNotFoundError,
+            pymobiledevice3.exceptions.ConnectionFailedToUsbmuxdError,
+        ):
             # usbmuxd needs a little time sometimes
             print("Failed to connect. Retrying...")
             await asyncio.sleep(0.3)
