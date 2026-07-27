@@ -63,7 +63,7 @@ async def main_real(dev: usb.core.Device, action: str) -> int:
                 # Wait for the device to disconnect
                 print("Waiting for device disconnect.")
                 await helpers.wait_disconnect(dev)
-                print(f"Device {lockdown.uuid} disconnected")
+                print(f"Device {lockdown.udid} disconnected")
 
                 # Release the old device
                 del dev

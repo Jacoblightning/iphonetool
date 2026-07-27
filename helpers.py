@@ -27,8 +27,15 @@ async def wait_device():
         await asyncio.sleep(0.1)
 
 async def wait_disconnect(dev: usb.core.Device):
-    while usb.core.find(idVendor=dev.idVendor, idProduct=dev.idProduct).serial_number == dev.serial_number:
-        await asyncio.sleep(0.1)
+    while True:
+        try:
+            device = usb.core.find(idVendor=dev.idVendor, idProduct=dev.idProduct)
+            if device is not None and device.serial_number == dev.serial_number:
+                await asyncio.sleep(0.1)
+                continue
+        except ValueError:
+            continue
+        break
 
 def classify_mode(dev: usb.core.Device) -> DeviceMode:
     match dev.idProduct:
