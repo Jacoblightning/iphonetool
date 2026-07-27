@@ -1,6 +1,6 @@
 [project]
 name = "iphonetool"
-version = "0.1.2"
+version = "0.2.0"
 authors = [
 	{ name="Jacob Freeman", email="t00niyf5@duck.com" },
 ]
