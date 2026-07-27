@@ -31,7 +31,10 @@ or from the mirror:
 
 ## Prerequisites
 
-Before you can run linux (or remote boot) on a phone, you must run `iphonetool-linuxprep`
+> [!IMPORTANT]  
+> When you clone [https://github.com/yhavry/remote_boot](https://github.com/yhavry/remote_boot), make sure you switch to the `d421-a12-a13-postpwned-prep` branch!
+
+Before you can run linux (or remote boot) on a phone, you must run `iphonetool-linuxprep` with a path to `remoteboot.sh`, which is located in [https://github.com/yhavry/remote_boot](https://github.com/yhavry/remote_boot)
 
 ## Usage
 
