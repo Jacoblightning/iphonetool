@@ -43,7 +43,7 @@ Before you can run linux (or remote boot) on a phone, you must run `iphonetool-l
 - `palera1n --dfuhelper`
 - `palera1n --exit-recovery`
 - `ideviceenterrecovery`
-- `remote_boot'ing linux`
+- `remote_booting linux`
 - `usbliter8ctl`
 
 ## License
