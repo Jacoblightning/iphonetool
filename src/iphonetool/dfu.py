@@ -7,49 +7,51 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from enum import IntEnum
 from typing import Any, Optional
-from collections.abc import Callable
 
 import usb.core
 
 try:
-    from . import config
-    from . import helpers
+    from . import config, helpers
 except ImportError:
     try:
         import config
         import helpers
     except ImportError:
         try:
-            from iphonetool import config
-            from iphonetool import helpers
+            from iphonetool import config, helpers
         except ImportError:
             raise ImportError("Could not import needed modules")
 
 
-async def func_info(dev: usb.core.Device, irecovery: str, pwned: bool, _args: argparse.Namespace) -> int:
+async def func_info(
+    dev: usb.core.Device, irecovery: str, pwned: bool, _args: argparse.Namespace
+) -> int:
     if pwned:
-        print(
-            f"Detected PWNED DFU mode {helpers.irecovery_info(irecovery, "NAME")}:"
-        )
+        print(f"Detected PWNED DFU mode {helpers.irecovery_info(irecovery, "NAME")}:")
     else:
         print(f"Detected DFU mode {helpers.irecovery_info(irecovery, "NAME")}:")
     print("iPhone ID:", helpers.irecovery_info(irecovery, "ECID"))
-    print(
-        "iPhone internal version:", helpers.irecovery_info(irecovery, "PRODUCT")
-    )
+    print("iPhone internal version:", helpers.irecovery_info(irecovery, "PRODUCT"))
     print("Codename:", helpers.irecovery_info(irecovery, "MODEL"))
     print("CPU:", helpers.irecovery_info(irecovery, "CPID")[2:])
 
     return 0
 
-async def func_exit_dfu_helper(_dev: usb.core.Device, _irecovery: str, _pwned: bool, _args: argparse.Namespace) -> int:
+
+async def func_exit_dfu_helper(
+    _dev: usb.core.Device, _irecovery: str, _pwned: bool, _args: argparse.Namespace
+) -> int:
     print("Idk. You figure it out")
 
     return 0
 
-async def func_demote(dev: usb.core.Device, irecovery: str, _pwned: bool, _args: argparse.Namespace) -> int:
+
+async def func_demote(
+    dev: usb.core.Device, irecovery: str, _pwned: bool, _args: argparse.Namespace
+) -> int:
     ecid = helpers.irecovery_info(irecovery, "ECID")
     print(f"Telling device {ecid} to demote to development.")
     send_usbliter8_command(dev, Usbliter8Command.CUSTOM_DEMOTE, None, 100)
@@ -57,7 +59,10 @@ async def func_demote(dev: usb.core.Device, irecovery: str, _pwned: bool, _args:
 
     return 0
 
-async def func_boot_raw(dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace) -> int:
+
+async def func_boot_raw(
+    dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace
+) -> int:
     iboot_file = args.iboot
     print(f"Uploading {iboot_file} to device...")
     usbliter8_download(dev, iboot_file.read_bytes())
@@ -68,12 +73,17 @@ async def func_boot_raw(dev: usb.core.Device, _irecovery: str, _pwned: bool, arg
     return 0
 
 
-async def func_boot_remote(dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace) -> int:
+async def func_boot_remote(
+    dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace
+) -> int:
     linux_remote_boot(args.m1n1, args.monitor, args.remoteboot)
 
     return 0
 
-async def func_boot_linux(dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace) -> int:
+
+async def func_boot_linux(
+    dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace
+) -> int:
     print("Preapring iboot...")
     with tempfile.NamedTemporaryFile(mode="wb") as m1n1_blob_file:
         print("adding m1n1")
@@ -81,9 +91,7 @@ async def func_boot_linux(dev: usb.core.Device, _irecovery: str, _pwned: bool, a
             shutil.copyfileobj(f, m1n1_blob_file)
         if args.commandline is not None:
             print("adding commandline")
-            m1n1_blob_file.write(
-                f'chosen.bootargs={args.commandline}\n'.encode()
-            )
+            m1n1_blob_file.write(f"chosen.bootargs={args.commandline}\n".encode())
         if args.dtb is not None:
             if not args.dtb.is_file():
                 raise ValueError("Specified DTB is not a file.")
@@ -110,14 +118,14 @@ async def func_boot_linux(dev: usb.core.Device, _irecovery: str, _pwned: bool, a
 
     return 0
 
-async def main(
-    dev: usb.core.Device,
-    parser: argparse.ArgumentParser
-):
+
+async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(required=True)
 
     subparsers.add_parser("info", help="Print device info").set_defaults(func=func_info)
-    subparsers.add_parser("exit_dfu_helper", help="Help exiting DFU mode").set_defaults(func=func_exit_dfu_helper)
+    subparsers.add_parser("exit_dfu_helper", help="Help exiting DFU mode").set_defaults(
+        func=func_exit_dfu_helper
+    )
 
     try:
         serial = dev.serial_number
@@ -162,7 +170,12 @@ async def main(
         boot_remote_parser.add_argument(
             "-m", "--monitor", type=pathlib.Path, help="m1n1 monitor stub"
         )
-        boot_remote_parser.add_argument("--remoteboot", type=pathlib.Path, help="Path to remoteboot.sh", required=True)
+        boot_remote_parser.add_argument(
+            "--remoteboot",
+            type=pathlib.Path,
+            help="Path to remoteboot.sh",
+            required=True,
+        )
         boot_remote_parser.set_defaults(func=func_boot_remote)
 
         # High-level linux booter
@@ -195,7 +208,12 @@ async def main(
         linux_parser.add_argument(
             "-m", "--monitor", type=pathlib.Path, help="m1n1 monitor stub"
         )
-        linux_parser.add_argument("--remoteboot", type=pathlib.Path, help="Path to remoteboot.sh", required=True)
+        linux_parser.add_argument(
+            "--remoteboot",
+            type=pathlib.Path,
+            help="Path to remoteboot.sh",
+            required=True,
+        )
         linux_parser.set_defaults(func=func_boot_linux)
 
     args = parser.parse_args()
@@ -240,11 +258,16 @@ def usbliter8_download(dev: usb.core.Device, data: bytes) -> True:
     send_usbliter8_command(dev, Usbliter8Command.DFU_DNLOAD, None, 100)
 
 
-def linux_remote_boot(m1n1_blob: pathlib.Path, monitor_stub: Optional[pathlib.Path], remoteboot: pathlib.Path):
+def linux_remote_boot(
+    m1n1_blob: pathlib.Path,
+    monitor_stub: Optional[pathlib.Path],
+    remoteboot: pathlib.Path,
+):
     if monitor_stub is not None:
         subprocess.check_call(
             [
-                "bash", remoteboot,
+                "bash",
+                remoteboot,
                 "boot",
                 m1n1_blob,
                 monitor_stub,
@@ -265,22 +288,24 @@ def linux_remote_boot(m1n1_blob: pathlib.Path, monitor_stub: Optional[pathlib.Pa
             },
         )
 
+
 def linux_prep():
     parser = argparse.ArgumentParser()
     parser.add_argument("remoteboot", type=pathlib.Path, help="Path to remoteboot.sh")
 
     args = parser.parse_args()
 
-    subprocess.check_call(
-        ["bash", args.remoteboot, "build"]
-    )
-    subprocess.check_call(
-        ["sudo", "bash", args.remoteboot, "prep"]
-    )
+    subprocess.check_call(["bash", args.remoteboot, "build"])
+    subprocess.check_call(["sudo", "bash", args.remoteboot, "prep"])
     print("You can now boot linux on your device")
 
+
 async def run_subcommand(
-    dev: usb.core.Device, pwned: bool, serial: str, func: Callable, args: argparse.Namespace
+    dev: usb.core.Device,
+    pwned: bool,
+    serial: str,
+    func: Callable,
+    args: argparse.Namespace,
 ) -> int:
     ecid = int(helpers.serial_info(serial, "ECID"), 16)
 

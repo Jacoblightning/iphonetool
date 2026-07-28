@@ -1,12 +1,10 @@
 import argparse
 import asyncio
+from collections.abc import Callable
 
 import usb.core
 
-from collections.abc import Callable
-
-from . import helpers
-from . import recovery
+from . import helpers, recovery
 
 try:
     import pymobiledevice3.exceptions
@@ -19,6 +17,7 @@ except ImportError:
 
 # Signature of subcommands: lockdown, dev
 
+
 async def func_info(_dev: usb.core.Device, lockdown) -> int:
     print(f"Detected normal mode {lockdown.display_name}:")
     print("iPhone ID:", lockdown.udid)
@@ -30,6 +29,7 @@ async def func_info(_dev: usb.core.Device, lockdown) -> int:
 
     return 0
 
+
 async def func_dfu_helper(dev: usb.core.Device, lockdown) -> int:
     # Put device into recovery
     print(f"Telling device {lockdown.udid} to enter recovery.")
@@ -37,7 +37,9 @@ async def func_dfu_helper(dev: usb.core.Device, lockdown) -> int:
     print(f"Device {lockdown.udid} has entered recovery.")
 
     # Wait for the device to disconnect
-    print("Waiting for device disconnect. You may need to re-plug if this takes too long")
+    print(
+        "Waiting for device disconnect. You may need to re-plug if this takes too long"
+    )
     await helpers.wait_disconnect(dev)
     print(f"Device {lockdown.udid} disconnected")
 
@@ -73,19 +75,21 @@ async def func_enter_recovery(_dev: usb.core.Device, lockdown) -> int:
     return 0
 
 
-async def main(
-    dev: usb.core.Device,
-    parser: argparse.ArgumentParser
-) -> int:
+async def main(dev: usb.core.Device, parser: argparse.ArgumentParser) -> int:
     subparsers = parser.add_subparsers(required=True)
 
     subparsers.add_parser("info", help="Print device info").set_defaults(func=func_info)
-    subparsers.add_parser("dfu_helper", help="Help put device into DFU mode").set_defaults(func=func_dfu_helper)
-    subparsers.add_parser("enter_recovery", help="Enter recovery mode").set_defaults(func=func_enter_recovery)
+    subparsers.add_parser(
+        "dfu_helper", help="Help put device into DFU mode"
+    ).set_defaults(func=func_dfu_helper)
+    subparsers.add_parser("enter_recovery", help="Enter recovery mode").set_defaults(
+        func=func_enter_recovery
+    )
 
     args = parser.parse_args()
 
     return await run_subcommand(dev, args.func)
+
 
 async def run_subcommand(dev: usb.core.Device, subcommand: Callable) -> int:
     serial = dev.serial_number.rstrip("\x00")

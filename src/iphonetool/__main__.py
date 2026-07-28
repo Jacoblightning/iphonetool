@@ -51,8 +51,10 @@ async def main() -> int:
         case helpers.DeviceMode.DFU:
             return await dfu.main(dev, parser)
 
+
 def runmain() -> int:
     return asyncio.run(main())
+
 
 if __name__ == "__main__":
     exit(runmain())

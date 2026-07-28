@@ -13,7 +13,6 @@ import argparse
 import pathlib
 
 import usb
-
 from dfu import Usbliter8Command, send_usbliter8_command, usbliter8_download
 from helpers import get_device
 
