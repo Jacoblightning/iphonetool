@@ -38,21 +38,18 @@ async def main() -> int:
     parser.add_argument(
         "-w", "--wait", help="Wait for a device to appear", action="store_true"
     )
-    subparsers = parser.add_subparsers(dest="action", help="What action to run:", required=True)
-    # List is supported in all modes
-    subparsers.add_parser("info", help="Print device info")
 
     if dev is None:
-        return await normal.main(None, parser, subparsers)
+        return await normal.main(None, parser)
 
     # Figure out what mode the device is in
     match helpers.classify_mode(dev):
         case helpers.DeviceMode.NORMAL:
-            return await normal.main(dev, parser, subparsers)
+            return await normal.main(dev, parser)
         case helpers.DeviceMode.RECOVERY:
-            return await recovery.main(dev, parser, subparsers)
+            return await recovery.main(dev, parser)
         case helpers.DeviceMode.DFU:
-            return await dfu.main(dev, parser, subparsers)
+            return await dfu.main(dev, parser)
 
 def runmain() -> int:
     return asyncio.run(main())

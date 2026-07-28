@@ -3,6 +3,8 @@ import asyncio
 
 import usb.core
 
+from collections.abc import Callable
+
 from . import helpers
 from . import recovery
 
@@ -15,22 +17,77 @@ except ImportError:
     )
     raise
 
+# Signature of subcommands: lockdown, dev
+
+async def func_info(_dev: usb.core.Device, lockdown) -> int:
+    print(f"Detected normal mode {lockdown.display_name}:")
+    print("iPhone ID:", lockdown.udid)
+    print("iPhone internal version:", lockdown.product_type)
+    print("Device name:", lockdown.all_values["DeviceName"])
+    print("iOS Version:", lockdown.product_version)
+    print("Codename:", lockdown.hardware_model.upper())
+    print("CPU:", lockdown.all_values["HardwarePlatform"].upper())
+
+    return 0
+
+async def func_dfu_helper(dev: usb.core.Device, lockdown) -> int:
+    # Put device into recovery
+    print(f"Telling device {lockdown.udid} to enter recovery.")
+    await lockdown.enter_recovery()
+    print(f"Device {lockdown.udid} has entered recovery.")
+
+    # Wait for the device to disconnect
+    print("Waiting for device disconnect. You may need to re-plug if this takes too long")
+    await helpers.wait_disconnect(dev)
+    print(f"Device {lockdown.udid} disconnected")
+
+    # Release the old device TODO: Is this needed?
+    del dev
+
+    # Get a new device
+    print("Waiting for device to reconnect...")
+    dev = await helpers.wait_device()
+
+    # Make sure the device is in recovery mode
+    mode = helpers.classify_mode(dev)
+
+    match mode:
+        case helpers.DeviceMode.NORMAL:
+            # Somehow stayed in normal mode
+            print("Whoops. Device did not enter recovery mode.")
+            return await run_subcommand(dev, func_dfu_helper)
+        case helpers.DeviceMode.RECOVERY:
+            # Continue dfu helper there
+            return await recovery.run_subcommand(dev, recovery.func_dfu_helper)
+        case helpers.DeviceMode.DFU:
+            # ???
+            print("Device entered DFU mode successfully!")
+            return 0
+
+
+async def func_enter_recovery(_dev: usb.core.Device, lockdown) -> int:
+    print(f"Telling device {lockdown.udid} to enter recovery.")
+    await lockdown.enter_recovery()
+    print(f"Device {lockdown.udid} has entered recovery.")
+
+    return 0
+
 
 async def main(
     dev: usb.core.Device,
-    parser: argparse.ArgumentParser,
-    subparsers: argparse._SubParsersAction,
+    parser: argparse.ArgumentParser
 ) -> int:
-    subparsers.add_parser("dfu_helper", help="Help put device into DFU mode")
-    subparsers.add_parser("enter_recovery", help="Enter recovery mode")
+    subparsers = parser.add_subparsers(required=True)
+
+    subparsers.add_parser("info", help="Print device info").set_defaults(func=func_info)
+    subparsers.add_parser("dfu_helper", help="Help put device into DFU mode").set_defaults(func=func_dfu_helper)
+    subparsers.add_parser("enter_recovery", help="Enter recovery mode").set_defaults(func=func_enter_recovery)
 
     args = parser.parse_args()
 
-    return await main_real(dev, args.action)
+    return await run_subcommand(dev, args.func)
 
-
-# This can be called easily from other python files
-async def main_real(dev: usb.core.Device, action: str) -> int:
+async def run_subcommand(dev: usb.core.Device, subcommand: Callable) -> int:
     serial = dev.serial_number.rstrip("\x00")
 
     while True:
@@ -52,38 +109,4 @@ async def main_real(dev: usb.core.Device, action: str) -> int:
             raise ValueError("Failed to connect to device") from e
 
     async with connector as lockdown:
-        match action:
-            case "info":
-                print(f"Detected normal mode {lockdown.display_name}:")
-                print("iPhone ID:", lockdown.udid)
-                print("iPhone internal version:", lockdown.product_type)
-                print("Device name:", lockdown.all_values["DeviceName"])
-                print("iOS Version:", lockdown.product_version)
-                print("Codename:", lockdown.hardware_model.upper())
-                print("CPU:", lockdown.all_values["HardwarePlatform"].upper())
-            case "enter_recovery":
-                print(f"Telling device {lockdown.udid} to enter recovery.")
-                await lockdown.enter_recovery()
-                print(f"Device {lockdown.udid} has entered recovery.")
-            case "dfu_helper":
-                # Put device into recovery
-                print(f"Telling device {lockdown.udid} to enter recovery.")
-                await lockdown.enter_recovery()
-                print(f"Device {lockdown.udid} has entered recovery.")
-
-                # Wait for the device to disconnect
-                print("Waiting for device disconnect.")
-                await helpers.wait_disconnect(dev)
-                print(f"Device {lockdown.udid} disconnected")
-
-                # Release the old device
-                del dev
-
-                # Get a new device
-                print("Waiting for device to reconnect...")
-                dev = await helpers.wait_device()
-
-                # Continue dfu helper there
-                return await recovery.main_real(dev, "dfu_helper")
-
-    return 0
+        return await subcommand(dev, lockdown)
