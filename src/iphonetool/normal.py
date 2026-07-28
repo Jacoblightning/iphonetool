@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 from collections.abc import Callable
+from typing import Optional
 
 import usb.core
 
@@ -8,8 +9,8 @@ try:
     from . import helpers, recovery
 except ImportError:
     try:
-        import helpers
-        import recovery
+        import helpers  # type: ignore
+        import recovery  # type: ignore
     except ImportError:
         try:
             from iphonetool import helpers, recovery
@@ -77,7 +78,7 @@ async def func_dfu_helper(dev: usb.core.Device, lockdown) -> int:
             return 0
 
 
-async def func_enter_recovery(_dev: usb.core.Device, lockdown) -> int:
+async def func_reboot_recovery(_dev: usb.core.Device, lockdown) -> int:
     print(f"Telling device {lockdown.udid} to enter recovery.")
     await lockdown.enter_recovery()
     print(f"Device {lockdown.udid} has entered recovery.")
@@ -85,18 +86,33 @@ async def func_enter_recovery(_dev: usb.core.Device, lockdown) -> int:
     return 0
 
 
-async def main(dev: usb.core.Device, parser: argparse.ArgumentParser) -> int:
+async def func_reboot(_dev: usb.core.Device, lockdown) -> int:
+    print(f"Telling device {lockdown.udid} to reboot.")
+    await lockdown.reboot()
+
+    return 0
+
+
+async def main(dev: Optional[usb.core.Device], parser: argparse.ArgumentParser) -> int:
     subparsers = parser.add_subparsers(required=True)
 
     subparsers.add_parser("info", help="Print device info").set_defaults(func=func_info)
-    subparsers.add_parser(
-        "dfu_helper", help="Help put device into DFU mode"
-    ).set_defaults(func=func_dfu_helper)
-    subparsers.add_parser("enter_recovery", help="Enter recovery mode").set_defaults(
-        func=func_enter_recovery
+
+    reboot_parser = subparsers.add_parser("reboot", help="Reboot device")
+    reboot_parser.set_defaults(func=func_reboot)
+    reboot_subcommands = reboot_parser.add_subparsers(help="Reboot mode")
+
+    reboot_subcommands.add_parser("system", help="Reboot into iOS (default)")
+    reboot_subcommands.add_parser("recovery", help="Reboot into recovery").set_defaults(
+        func=func_reboot_recovery
     )
+    reboot_subcommands.add_parser(
+        "dfu", help="Reboot into dfu (not automatic!)"
+    ).set_defaults(func=func_dfu_helper)
 
     args = parser.parse_args()
+
+    assert dev is not None
 
     return await run_subcommand(dev, args.func)
 

@@ -7,25 +7,26 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable
-import requests
 import zipfile
-import tqdm
-from enum import IntEnum
+from collections.abc import Callable
+from enum import IntEnum, auto
 from typing import Any, Optional
 
+import requests
+import tqdm
 import usb.core
 
 try:
-    from . import config, helpers, recovery
+    from . import config, helpers, normal, recovery
 except ImportError:
     try:
-        import config
-        import helpers
-        import recovery
+        import config  # type: ignore
+        import helpers  # type: ignore
+        import normal  # type: ignore
+        import recovery  # type: ignore
     except ImportError:
         try:
-            from iphonetool import config, helpers, recovery
+            from iphonetool import config, helpers, normal, recovery
         except ImportError:
             raise ImportError("Could not import needed modules")
 
@@ -44,15 +45,19 @@ async def func_info(
 
     return 0
 
+
 async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
     product_code = helpers.irecovery_info(irecovery, "PRODUCT")
 
-    ipsw_urls = subprocess.check_output(
-        ["ipsw", "download", "ipsw", "-u", "--device", product_code]
-    ).decode().splitlines()
+    ipsw_urls = (
+        subprocess.check_output(
+            ["ipsw", "download", "ipsw", "-u", "--device", product_code]
+        )
+        .decode()
+        .splitlines()
+    )
 
-
-    ipsw_url = ipsw_urls[-1] # Take the last (oldest) one as it will be the smallest
+    ipsw_url = ipsw_urls[-1]  # Take the last (oldest) one as it will be the smallest
 
     response = requests.get(ipsw_url, stream=True)
 
@@ -64,11 +69,12 @@ async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
             #     print("Downloading...")
             #     shutil.copyfileobj(r, f)
             print("Downlading...")
-            with tqdm.tqdm(total=int(response.headers["Content-Length"]), unit="b", unit_scale=True) as progressbar:
-                for data in response.iter_content(chunk_size=10*1024):
+            with tqdm.tqdm(
+                total=int(response.headers["Content-Length"]), unit="b", unit_scale=True
+            ) as progressbar:
+                for data in response.iter_content(chunk_size=10 * 1024):
                     f.write(data)
                     progressbar.update(len(data))
-
 
             # Extract the (encrypted) iboot
 
@@ -90,11 +96,32 @@ async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
         print("Decrypting...")
 
         subprocess.check_call(
-            ["ipsw", "-V", "img4", "im4p", "extract", "--lookup", "--lookup-device", product_code, "--lookup-build", iOS_build, "--output", output_path, enc_file]
+            [
+                "ipsw",
+                "-V",
+                "img4",
+                "im4p",
+                "extract",
+                "--lookup",
+                "--lookup-device",
+                product_code,
+                "--lookup-build",
+                iOS_build,
+                "--output",
+                output_path,
+                enc_file,
+            ]
         )
 
-async def func_exit_dfu(
-    dev: usb.core.Device, irecovery: str, _pwned: bool, args: argparse.Namespace
+
+class RebootTarget(IntEnum):
+    SYSTEM = auto()
+    RECOVERY = auto()
+    DFU = auto()
+
+
+async def func_reboot(
+    dev: usb.core.Device, irecovery: str, args: argparse.Namespace, target: RebootTarget
 ) -> int:
     if args.iboot is not None:
         if args.iboot.is_dir():
@@ -104,7 +131,7 @@ async def func_exit_dfu(
         usbliter8_boot(dev, args.iboot.read_bytes())
     else:
         with tempfile.TemporaryDirectory() as output_tempdir:
-            output = pathlib.Path(output_tempdir.name) / "iboot.macho"
+            output = pathlib.Path(output_tempdir) / "iboot.macho"
             await download_device_iboot(irecovery, output)
             usbliter8_boot(dev, output.read_bytes())
 
@@ -117,15 +144,50 @@ async def func_exit_dfu(
 
     match mode:
         case helpers.DeviceMode.NORMAL:
-            print("Device has exited DFU")
+            match target:
+                case RebootTarget.SYSTEM:
+                    print("Device has exited DFU")
+                case RebootTarget.RECOVERY:
+                    return await normal.run_subcommand(dev, normal.func_reboot_recovery)
+                case RebootTarget.DFU:
+                    return await normal.run_subcommand(dev, normal.func_dfu_helper)
         case helpers.DeviceMode.RECOVERY:
-            return await recovery.run_subcommand(dev, recovery.func_exit_recovery)
+            match target:
+                case RebootTarget.SYSTEM:
+                    return await recovery.run_subcommand(
+                        dev, recovery.func_exit_recovery
+                    )
+                case RebootTarget.RECOVERY:
+                    # Reboot into normal recovery. not iBoot recovery
+                    return await recovery.run_subcommand(
+                        dev, recovery.func_reboot_recovery
+                    )
+                case RebootTarget.DFU:
+                    return await recovery.run_subcommand(dev, recovery.func_dfu_helper)
         case helpers.DeviceMode.DFU:
             # ???
             print("Failed to exit DFU mode.")
             return 1
 
     return 0
+
+
+async def func_reboot_ios(
+    dev: usb.core.Device, irecovery: str, _pwned: bool, args: argparse.Namespace
+) -> int:
+    return await func_reboot(dev, irecovery, args, RebootTarget.SYSTEM)
+
+
+async def func_reboot_recovery(
+    dev: usb.core.Device, irecovery: str, _pwned: bool, args: argparse.Namespace
+) -> int:
+    return await func_reboot(dev, irecovery, args, RebootTarget.RECOVERY)
+
+
+async def func_reboot_dfu(
+    dev: usb.core.Device, irecovery: str, _pwned: bool, args: argparse.Namespace
+) -> int:
+    return await func_reboot(dev, irecovery, args, RebootTarget.DFU)
 
 
 async def func_demote(
@@ -178,7 +240,7 @@ async def func_boot_linux(
             if not args.dtbs.is_dir():
                 raise ValueError("Specified DTB directory is not a dir.")
             print("adding dtbs")
-            for dtb in glob.iglob("./*.dtb", root_dir=args["dtbs"]):
+            for dtb in glob.iglob("./*.dtb", root_dir=args.dtbs):
                 with (args.dtbs / dtb).open("rb") as f:
                     shutil.copyfileobj(f, m1n1_blob_file)
         print("adding kernel")
@@ -217,11 +279,22 @@ async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
             "demote", help="Demote this device to a development device"
         ).set_defaults(func=func_demote)
 
-        exit_dfu_parser = subparsers.add_parser(
-            "exit_dfu", help="Exit DFU mode"
+        reboot_parser = subparsers.add_parser("reboot", help="Reboot device")
+        reboot_parser.set_defaults(func=func_reboot_ios)
+        reboot_parser.add_argument(
+            "--iboot",
+            type=pathlib.Path,
+            help="Path to an iboot file to save/load. If it does not exist, the needed file will be downloaded and moved there. If not specified, a temporary location will be used.",
         )
-        exit_dfu_parser.add_argument("--iboot", type=pathlib.Path, help="Path to an iboot file to save/load. If it does not exist, the needed file will be downloaded and moved there. If not specified, a temporary location will be used.")
-        exit_dfu_parser.set_defaults(func=func_exit_dfu)
+        reboot_subcommands = reboot_parser.add_subparsers(help="Reboot mode")
+
+        reboot_subcommands.add_parser("system", help="Reboot into iOS (default)")
+        reboot_subcommands.add_parser(
+            "recovery", help="Reboot into recovery"
+        ).set_defaults(func=func_reboot_recovery)
+        reboot_subcommands.add_parser(
+            "dfu", help="Reboot into dfu (not automatic!)"
+        ).set_defaults(func=func_reboot_dfu)
 
         boot_parser = subparsers.add_parser(
             "boot", help='Low-level device exploit booting. You probably want "linux"'
@@ -336,6 +409,7 @@ def usbliter8_download(dev: usb.core.Device, data: bytes) -> None:
 
     send_usbliter8_command(dev, Usbliter8Command.DFU_DNLOAD, None, 100)
 
+
 def usbliter8_boot(dev: usb.core.Device, data: bytes) -> None:
     usbliter8_download(dev, data)
 
@@ -357,19 +431,19 @@ def linux_remote_boot(
                 m1n1_blob,
                 monitor_stub,
             ],
-            env={
+            env={  # type: ignore
                 "USBLITER8CTL": helpers.base_directory() / "usbliter8ctl.py",
                 "PYTHON": sys.executable,
-                "HOME": os.getenv("HOME"),
+                "HOME": os.getenv("HOME", "~"),
             },
         )
     else:
         subprocess.check_call(
             ["bash", remoteboot, "boot", m1n1_blob],
-            env={
+            env={  # type: ignore
                 "USBLITER8CTL": helpers.base_directory() / "usbliter8ctl.py",
                 "PYTHON": sys.executable,
-                "HOME": os.getenv("HOME"),
+                "HOME": os.getenv("HOME", "~"),
             },
         )
 

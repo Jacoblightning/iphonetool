@@ -13,8 +13,9 @@ import argparse
 import pathlib
 
 import usb
-from dfu import Usbliter8Command, send_usbliter8_command, usbliter8_download
-from helpers import get_device
+from dfu import send_usbliter8_command  # type: ignore
+from dfu import Usbliter8Command, usbliter8_download
+from helpers import get_device  # type: ignore
 
 
 def do_boot(args, dev):

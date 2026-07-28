@@ -11,7 +11,7 @@ try:
     from .config import APPLE_VENDORID, AppleProductId
 except ImportError:
     try:
-        from config import APPLE_VENDORID, AppleProductId
+        from config import APPLE_VENDORID, AppleProductId  # type: ignore
     except ImportError:
         try:
             from iphonetool.config import APPLE_VENDORID, AppleProductId
@@ -41,7 +41,7 @@ async def wait_device():
 async def wait_disconnect(dev: usb.core.Device):
     while True:
         try:
-            device = usb.core.find(idVendor=dev.idVendor, idProduct=dev.idProduct)
+            device = usb.core.find(idVendor=dev.idVendor, idProduct=dev.idProduct)  # type: ignore
             if device is not None and device.serial_number == dev.serial_number:
                 await asyncio.sleep(0.1)
                 continue
@@ -51,7 +51,7 @@ async def wait_disconnect(dev: usb.core.Device):
 
 
 def classify_mode(dev: usb.core.Device) -> DeviceMode:
-    match dev.idProduct:
+    match dev.idProduct:  # type: ignore
         case AppleProductId.RECOVERY:
             return DeviceMode.RECOVERY
         case AppleProductId.DFU:
