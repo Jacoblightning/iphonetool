@@ -67,8 +67,8 @@ async def func_dfu_helper(dev: usb.core.Device, lockdown) -> int:
     match mode:
         case helpers.DeviceMode.NORMAL:
             # Somehow stayed in normal mode
-            print("Whoops. Device did not enter recovery mode.")
-            return await run_subcommand(dev, func_dfu_helper)
+            print("Failed to put device into recovery mode.")
+            return 1
         case helpers.DeviceMode.RECOVERY:
             # Continue dfu helper there
             return await recovery.run_subcommand(dev, recovery.func_dfu_helper)
@@ -86,12 +86,31 @@ async def func_reboot_recovery(_dev: usb.core.Device, lockdown) -> int:
     return 0
 
 
-async def func_reboot(_dev: usb.core.Device, lockdown) -> int:
+async def func_reboot(dev: usb.core.Device, lockdown) -> int:
     print(f"Telling device {lockdown.udid} to reboot.")
-    await lockdown.reboot()
 
-    return 0
+    # Slightly cursed...
+    await lockdown.enter_recovery()
 
+    await helpers.wait_disconnect(dev)
+    del dev
+    dev = await helpers.wait_device()
+
+    # Make sure the device is in recovery mode
+    mode = helpers.classify_mode(dev)
+
+    match mode:
+        case helpers.DeviceMode.NORMAL:
+            # Somehow stayed in normal mode
+            print("Failed to reboot device.")
+            return 1
+        case helpers.DeviceMode.RECOVERY:
+            # Continue dfu helper there
+            return await recovery.run_subcommand(dev, recovery.func_exit_recovery)
+        case helpers.DeviceMode.DFU:
+            # ??????
+            print("Really failed to reboot device!")
+            return 1
 
 async def main(dev: Optional[usb.core.Device], parser: argparse.ArgumentParser) -> int:
     subparsers = parser.add_subparsers(required=True)
