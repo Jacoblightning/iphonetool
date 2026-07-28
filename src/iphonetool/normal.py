@@ -4,7 +4,17 @@ from collections.abc import Callable
 
 import usb.core
 
-from . import helpers, recovery
+try:
+    from . import helpers, recovery
+except ImportError:
+    try:
+        import helpers
+        import recovery
+    except ImportError:
+        try:
+            from iphonetool import helpers, recovery
+        except ImportError:
+            raise ImportError("Could not import needed modules")
 
 try:
     import pymobiledevice3.exceptions

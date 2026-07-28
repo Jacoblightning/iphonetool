@@ -6,7 +6,17 @@ from typing import Optional
 
 import usb.core
 
-from . import helpers, normal
+try:
+    from . import helpers, normal
+except ImportError:
+    try:
+        import helpers
+        import normal
+    except ImportError:
+        try:
+            from iphonetool import helpers, normal
+        except ImportError:
+            raise ImportError("Could not import needed modules")
 
 try:
     import pymobiledevice3

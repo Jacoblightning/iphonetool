@@ -8,20 +8,24 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable
+import requests
+import zipfile
+import tqdm
 from enum import IntEnum
 from typing import Any, Optional
 
 import usb.core
 
 try:
-    from . import config, helpers
+    from . import config, helpers, recovery
 except ImportError:
     try:
         import config
         import helpers
+        import recovery
     except ImportError:
         try:
-            from iphonetool import config, helpers
+            from iphonetool import config, helpers, recovery
         except ImportError:
             raise ImportError("Could not import needed modules")
 
@@ -40,11 +44,86 @@ async def func_info(
 
     return 0
 
+async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
+    product_code = helpers.irecovery_info(irecovery, "PRODUCT")
 
-async def func_exit_dfu_helper(
-    _dev: usb.core.Device, _irecovery: str, _pwned: bool, _args: argparse.Namespace
+    ipsw_urls = subprocess.check_output(
+        ["ipsw", "download", "ipsw", "-u", "--device", product_code]
+    ).decode().splitlines()
+
+
+    ipsw_url = ipsw_urls[-1] # Take the last (oldest) one as it will be the smallest
+
+    response = requests.get(ipsw_url, stream=True)
+
+    with tempfile.TemporaryDirectory() as enc_extract_dir:
+        with tempfile.TemporaryFile() as f:
+            # Download the ipsw
+
+            # with requests.get(ipsw_url, stream=True) as r:
+            #     print("Downloading...")
+            #     shutil.copyfileobj(r, f)
+            print("Downlading...")
+            with tqdm.tqdm(total=int(response.headers["Content-Length"]), unit="b", unit_scale=True) as progressbar:
+                for data in response.iter_content(chunk_size=10*1024):
+                    f.write(data)
+                    progressbar.update(len(data))
+
+
+            # Extract the (encrypted) iboot
+
+            board_version = helpers.irecovery_info(irecovery, "MODEL").lower()[:-2]
+            iboot_zipf = f"Firmware/all_flash/iBoot.{board_version}.RELEASE.im4p"
+
+            print("Extracting...")
+            with zipfile.ZipFile(f) as zipf:
+                zipf.extract(iboot_zipf, enc_extract_dir)
+
+        # no longer need the original file
+
+        # Decrypt the extracted file
+
+        enc_file = pathlib.Path(enc_extract_dir) / iboot_zipf
+
+        iOS_build = ipsw_url.split("_")[-2]
+
+        print("Decrypting...")
+
+        subprocess.check_call(
+            ["ipsw", "-V", "img4", "im4p", "extract", "--lookup", "--lookup-device", product_code, "--lookup-build", iOS_build, "--output", output_path, enc_file]
+        )
+
+async def func_exit_dfu(
+    dev: usb.core.Device, irecovery: str, _pwned: bool, args: argparse.Namespace
 ) -> int:
-    print("Idk. You figure it out")
+    if args.iboot is not None:
+        if args.iboot.is_dir():
+            raise ValueError("iboot must be a file")
+        if not args.iboot.exists():
+            await download_device_iboot(irecovery, args.iboot)
+        usbliter8_boot(dev, args.iboot.read_bytes())
+    else:
+        with tempfile.TemporaryDirectory() as output_tempdir:
+            output = pathlib.Path(output_tempdir.name) / "iboot.macho"
+            await download_device_iboot(irecovery, output)
+            usbliter8_boot(dev, output.read_bytes())
+
+    print("Waiting for device to switch into recovery")
+    await helpers.wait_disconnect(dev)
+    del dev
+    dev = await helpers.wait_device()
+
+    mode = helpers.classify_mode(dev)
+
+    match mode:
+        case helpers.DeviceMode.NORMAL:
+            print("Device has exited DFU")
+        case helpers.DeviceMode.RECOVERY:
+            return await recovery.run_subcommand(dev, recovery.func_exit_recovery)
+        case helpers.DeviceMode.DFU:
+            # ???
+            print("Failed to exit DFU mode.")
+            return 1
 
     return 0
 
@@ -65,10 +144,7 @@ async def func_boot_raw(
 ) -> int:
     iboot_file = args.iboot
     print(f"Uploading {iboot_file} to device...")
-    usbliter8_download(dev, iboot_file.read_bytes())
-
-    send_usbliter8_command(dev, Usbliter8Command.CUSTOM_BOOT, None, 100)
-    send_usbliter8_command(dev, Usbliter8Command.DFU_ABORT, None, 100)
+    usbliter8_boot(dev, iboot_file.read_bytes())
 
     return 0
 
@@ -123,9 +199,6 @@ async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(required=True)
 
     subparsers.add_parser("info", help="Print device info").set_defaults(func=func_info)
-    subparsers.add_parser("exit_dfu_helper", help="Help exiting DFU mode").set_defaults(
-        func=func_exit_dfu_helper
-    )
 
     try:
         serial = dev.serial_number
@@ -143,6 +216,12 @@ async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
         subparsers.add_parser(
             "demote", help="Demote this device to a development device"
         ).set_defaults(func=func_demote)
+
+        exit_dfu_parser = subparsers.add_parser(
+            "exit_dfu", help="Exit DFU mode"
+        )
+        exit_dfu_parser.add_argument("--iboot", type=pathlib.Path, help="Path to an iboot file to save/load. If it does not exist, the needed file will be downloaded and moved there. If not specified, a temporary location will be used.")
+        exit_dfu_parser.set_defaults(func=func_exit_dfu)
 
         boot_parser = subparsers.add_parser(
             "boot", help='Low-level device exploit booting. You probably want "linux"'
@@ -234,7 +313,7 @@ def send_usbliter8_command(
     dev.ctrl_transfer(0x21, command, 0, 0, data, timeout)
 
 
-def usbliter8_download(dev: usb.core.Device, data: bytes) -> True:
+def usbliter8_download(dev: usb.core.Device, data: bytes) -> None:
     offset = 0
     left = len(data)
 
@@ -256,6 +335,12 @@ def usbliter8_download(dev: usb.core.Device, data: bytes) -> True:
     print()
 
     send_usbliter8_command(dev, Usbliter8Command.DFU_DNLOAD, None, 100)
+
+def usbliter8_boot(dev: usb.core.Device, data: bytes) -> None:
+    usbliter8_download(dev, data)
+
+    send_usbliter8_command(dev, Usbliter8Command.CUSTOM_BOOT, None, 100)
+    send_usbliter8_command(dev, Usbliter8Command.DFU_ABORT, None, 100)
 
 
 def linux_remote_boot(

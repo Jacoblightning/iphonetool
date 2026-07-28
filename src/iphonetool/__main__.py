@@ -1,12 +1,3 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.13"
-# dependencies = [
-#     "pymobiledevice3>=10.1.0",
-#     "pyusb>=1.3.1",
-# ]
-# ///
-
 try:
     import usb.core
 except ImportError:

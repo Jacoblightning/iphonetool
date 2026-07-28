@@ -565,6 +565,8 @@ source = { editable = "." }
 dependencies = [
     { name = "pymobiledevice3" },
     { name = "pyusb" },
+    { name = "requests" },
+    { name = "tqdm" },
 ]
 
 [package.dev-dependencies]
@@ -577,6 +579,8 @@ dev = [
 requires-dist = [
     { name = "pymobiledevice3", specifier = ">=10.1.0" },
     { name = "pyusb", specifier = ">=1.3.1" },
+    { name = "requests", specifier = ">=2.34.2" },
+    { name = "tqdm", specifier = ">=4.69.1" },
 ]
 
 [package.metadata.requires-dev]
