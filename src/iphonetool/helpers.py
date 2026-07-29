@@ -72,7 +72,7 @@ def serial_info_get(serial, key) -> Optional[str]:
 def serial_info(serial, key) -> str:
     value = serial_info_get(serial, key)
     if value is None:
-        raise ValueError(f"Could not find key {key} in recovery serial {serial}")
+        raise IndexError(f"Could not find key {key} in recovery serial {serial}")
     return value
 
 
@@ -80,7 +80,7 @@ def irecovery_info(irecovery, key) -> str:
     try:
         return dict(list(map(functools.partial(str.split, sep=":", maxsplit=1), irecovery.splitlines())))[key.upper()].strip()  # type: ignore
     except IndexError as e:
-        raise ValueError(
+        raise IndexError(
             f"Could not find key {key} in irecovery data {irecovery}"
         ) from e
 
