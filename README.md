@@ -23,11 +23,11 @@ or from	the mirror:
 `pip install git+https://github.com/Jacoblightning/iphonetool.git@master`
 
 #### uv
-`uv tool install https://git.jacoblightning3.xyz/jacoblightning3/iphonetool.git`
+`uv tool install --compile-bytecode  https://git.jacoblightning3.xyz/jacoblightning3/iphonetool.git`
 
 or from the mirror:
 
-`uv tool install https://github.com/Jacoblightning/iphonetool.git`
+`uv tool install --compile-bytecode https://github.com/Jacoblightning/iphonetool.git`
 
 ## Prerequisites
 
