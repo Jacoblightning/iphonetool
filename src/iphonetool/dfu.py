@@ -14,7 +14,6 @@ from enum import IntEnum, auto
 from typing import Any, Optional
 
 import requests
-import tqdm
 import usb.core
 
 try:
