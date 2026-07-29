@@ -112,6 +112,7 @@ async def func_reboot(dev: usb.core.Device, lockdown) -> int:
             print("Really failed to reboot device!")
             return 1
 
+
 async def main(dev: Optional[usb.core.Device], parser: argparse.ArgumentParser) -> int:
     subparsers = parser.add_subparsers(required=True)
 

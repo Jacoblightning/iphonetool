@@ -6,14 +6,14 @@ import pathlib
 import shutil
 import subprocess
 import sys
-import urllib.parse
 import tempfile
-import remotezip
+import urllib.parse
 from collections.abc import Callable
 from enum import IntEnum, auto
 from typing import Any, Optional
 
 import httpx
+import remotezip
 import usb.core
 
 try:
@@ -52,9 +52,15 @@ async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
     print("Checking IPSWs...")
 
     async with httpx.AsyncClient() as async_httpx:
-        ipsw_urls = (await async_httpx.get(f"https://api.ipsw.me/v4/ipsw/device/{urllib.parse.quote(product_code)}")).json()
+        ipsw_urls = (
+            await async_httpx.get(
+                f"https://api.ipsw.me/v4/ipsw/device/{urllib.parse.quote(product_code)}"
+            )
+        ).json()
 
-    ipsw_url = ipsw_urls["firmwares"][-1]["url"]  # Take the last (oldest) one as it will be the smallest
+    ipsw_url = ipsw_urls["firmwares"][-1][
+        "url"
+    ]  # Take the last (oldest) one as it will be the smallest
 
     with tempfile.TemporaryDirectory() as enc_extract_dir:
         # Download and extract the (encrypted) iboot
@@ -62,7 +68,6 @@ async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
 
         board_version = helpers.irecovery_info(irecovery, "MODEL").lower()[:-2]
         iboot_zipf = f"Firmware/all_flash/iBoot.{board_version}.RELEASE.im4p"
-
 
         with remotezip.RemoteZip(ipsw_url) as zipf:
             zipf.extract(iboot_zipf, enc_extract_dir)
