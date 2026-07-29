@@ -12,7 +12,13 @@ from collections.abc import Callable
 from enum import IntEnum, auto
 from typing import Any, Optional
 
-import httpx
+# We might not have httpx if this is imported from the usbliter8ctl standalone script
+try:
+    import httpx
+    has_httpx = False
+except ImportError:
+    has_httpx = True
+
 import remotezip
 import usb.core
 
@@ -47,6 +53,9 @@ async def func_info(
 
 
 async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
+    if not has_httpx:
+        raise ValueError("Cannot reboot from dfu without httpx")
+
     product_code = helpers.irecovery_info(irecovery, "PRODUCT")
 
     print("Checking IPSWs...")
