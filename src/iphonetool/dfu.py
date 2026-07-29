@@ -6,8 +6,9 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import urllib.parse
 import tempfile
-import zipfile
+import remotezip
 from collections.abc import Callable
 from enum import IntEnum, auto
 from typing import Any, Optional
@@ -49,43 +50,22 @@ async def func_info(
 async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
     product_code = helpers.irecovery_info(irecovery, "PRODUCT")
 
-    ipsw_urls = (
-        subprocess.check_output(
-            ["ipsw", "download", "ipsw", "-u", "--device", product_code]
-        )
-        .decode()
-        .splitlines()
-    )
+    print("Checking IPSWs...")
 
-    ipsw_url = ipsw_urls[-1]  # Take the last (oldest) one as it will be the smallest
+    ipsw_urls = requests.get(f"https://api.ipsw.me/v4/ipsw/device/{urllib.parse.quote(product_code)}").json()
 
-    response = requests.get(ipsw_url, stream=True)
+    ipsw_url = ipsw_urls["firmwares"][-1]["url"]  # Take the last (oldest) one as it will be the smallest
 
     with tempfile.TemporaryDirectory() as enc_extract_dir:
-        with tempfile.TemporaryFile() as f:
-            # Download the ipsw
+        # Download and extract the (encrypted) iboot
+        print("Downlading and extracting...")
 
-            # with requests.get(ipsw_url, stream=True) as r:
-            #     print("Downloading...")
-            #     shutil.copyfileobj(r, f)
-            print("Downlading...")
-            with tqdm.tqdm(
-                total=int(response.headers["Content-Length"]), unit="b", unit_scale=True
-            ) as progressbar:
-                for data in response.iter_content(chunk_size=10 * 1024):
-                    f.write(data)
-                    progressbar.update(len(data))
+        board_version = helpers.irecovery_info(irecovery, "MODEL").lower()[:-2]
+        iboot_zipf = f"Firmware/all_flash/iBoot.{board_version}.RELEASE.im4p"
 
-            # Extract the (encrypted) iboot
 
-            board_version = helpers.irecovery_info(irecovery, "MODEL").lower()[:-2]
-            iboot_zipf = f"Firmware/all_flash/iBoot.{board_version}.RELEASE.im4p"
-
-            print("Extracting...")
-            with zipfile.ZipFile(f) as zipf:
-                zipf.extract(iboot_zipf, enc_extract_dir)
-
-        # no longer need the original file
+        with remotezip.RemoteZip(ipsw_url) as zipf:
+            zipf.extract(iboot_zipf, enc_extract_dir)
 
         # Decrypt the extracted file
 
