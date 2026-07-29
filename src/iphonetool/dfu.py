@@ -13,7 +13,7 @@ from collections.abc import Callable
 from enum import IntEnum, auto
 from typing import Any, Optional
 
-import requests
+import httpx
 import usb.core
 
 try:
@@ -51,7 +51,8 @@ async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
 
     print("Checking IPSWs...")
 
-    ipsw_urls = requests.get(f"https://api.ipsw.me/v4/ipsw/device/{urllib.parse.quote(product_code)}").json()
+    async with httpx.AsyncClient() as async_httpx:
+        ipsw_urls = (await async_httpx.get(f"https://api.ipsw.me/v4/ipsw/device/{urllib.parse.quote(product_code)}")).json()
 
     ipsw_url = ipsw_urls["firmwares"][-1]["url"]  # Take the last (oldest) one as it will be the smallest
 
