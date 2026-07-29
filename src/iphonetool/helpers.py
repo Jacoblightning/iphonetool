@@ -2,7 +2,7 @@ import asyncio
 import functools
 import pathlib
 import subprocess
-from enum import Enum, auto
+from enum import Enum, auto, IntEnum
 from typing import Optional
 
 import usb.core
@@ -18,6 +18,15 @@ except ImportError:
         except ImportError:
             raise ImportError("Could not import needed modules")
 
+class AppleCPU(IntEnum):
+    A8   = 0x7000
+    A8X  = 0x7001
+    A9S  = 0x8000
+    A9T  = 0x8003
+    A9X  = 0x8001
+    A10  = 0x8010
+    A10X = 0x8011
+    A11  = 0x8015
 
 class DeviceMode(Enum):
     NORMAL = auto()

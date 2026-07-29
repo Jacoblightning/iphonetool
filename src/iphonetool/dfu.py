@@ -251,6 +251,10 @@ async def func_boot_linux(
     return 0
 
 
+def can_checkm8(cpu: int) -> bool:
+    return cpu in (helpers.AppleCPU.A8, helpers.AppleCPU.A8X, helpers.AppleCPU.A9S, helpers.AppleCPU.A9T, helpers.AppleCPU.A9X, helpers.AppleCPU.A10, helpers.AppleCPU.A10X, helpers.AppleCPU.A11)
+
+
 async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(required=True)
 
@@ -361,6 +365,9 @@ async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
             required=True,
         )
         linux_parser.set_defaults(func=func_boot_linux)
+
+    if can_checkm8(int(helpers.serial_info(serial, "CPID"))):
+        subparsers.add_parser()
 
     args = parser.parse_args()
 
