@@ -18,14 +18,6 @@ except ImportError:
         except ImportError:
             raise ImportError("Could not import needed modules")
 
-try:
-    import pymobiledevice3
-except ImportError:
-    print(
-        "pymobiledevice3 not installed and is needed for normal/recovery mode operation. Please install pymobiledevice3"
-    )
-    raise
-
 
 async def print_in(secs: float, message: str) -> None:
     try:
