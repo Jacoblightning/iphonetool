@@ -20,11 +20,9 @@ except ImportError:
 try:
     import pymobiledevice3.exceptions
     import pymobiledevice3.lockdown
+    has_all_deps = True
 except ImportError:
-    print(
-        "pymobiledevice3 not installed and is needed for normal/recovery mode operation. Please install pymobiledevice3"
-    )
-    raise
+    has_all_deps = False
 
 # Signature of subcommands: lockdown, dev
 
@@ -138,6 +136,9 @@ async def main(dev: Optional[usb.core.Device], parser: argparse.ArgumentParser) 
 
 
 async def run_subcommand(dev: usb.core.Device, subcommand: Callable) -> int:
+    if not has_all_deps:
+        raise ValueError("pymobiledevice3 not installed and is needed for normal/recovery mode operation. Please install pymobiledevice3")
+
     serial = dev.serial_number.rstrip("\x00")
 
     while True:
