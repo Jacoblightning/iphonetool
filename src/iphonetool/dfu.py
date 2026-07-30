@@ -15,11 +15,11 @@ from typing import Any, Optional
 # We might not have httpx if this is imported from the usbliter8ctl standalone script
 try:
     import httpx
-    has_httpx = False
+    import remotezip
+    has_all_deps = False
 except ImportError:
-    has_httpx = True
+    has_all_deps = True
 
-import remotezip
 import usb.core
 
 try:
@@ -53,8 +53,8 @@ async def func_info(
 
 
 async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
-    if not has_httpx:
-        raise ValueError("Cannot reboot from dfu without httpx")
+    if not has_all_deps:
+        raise ValueError("Cannot reboot from dfu without httpx and remotezip")
 
     product_code = helpers.irecovery_info(irecovery, "PRODUCT")
 
