@@ -9,16 +9,16 @@ import sys
 import tempfile
 import urllib.parse
 from collections.abc import Callable
-from enum import IntEnum, auto
+from enum import IntEnum, auto, Enum
 from typing import Any, Optional
 
 # We might not have httpx if this is imported from the usbliter8ctl standalone script
 try:
     import httpx
     import remotezip
-    has_all_deps = False
-except ImportError:
     has_all_deps = True
+except ImportError:
+    has_all_deps = False
 
 import usb.core
 
@@ -36,14 +36,22 @@ except ImportError:
         except ImportError:
             raise ImportError("Could not import needed modules")
 
+class PwnMethod(Enum):
+    NONE = auto()
+    CHECKM8 = auto()
+    USBLITER8 = auto()
+
 
 async def func_info(
-    dev: usb.core.Device, irecovery: str, pwned: bool, _args: argparse.Namespace
+    dev: usb.core.Device, irecovery: str, pwned: PwnMethod, _args: argparse.Namespace
 ) -> int:
-    if pwned:
-        print(f"Detected PWNED DFU mode {helpers.irecovery_info(irecovery, "NAME")}:")
-    else:
-        print(f"Detected DFU mode {helpers.irecovery_info(irecovery, "NAME")}:")
+    match pwned:
+        case PwnMethod.CHECKM8:
+            print(f"Detected CHECKM8able DFU mode {helpers.irecovery_info(irecovery, "NAME")}:")
+        case PwnMethod.USBLITER8:
+            print(f"Detected PWNED DFU mode {helpers.irecovery_info(irecovery, "NAME")}:")
+        case PwnMethod.NONE:
+            print(f"Detected DFU mode {helpers.irecovery_info(irecovery, "NAME")}:")
     print("iPhone ID:", helpers.irecovery_info(irecovery, "ECID"))
     print("iPhone internal version:", helpers.irecovery_info(irecovery, "PRODUCT"))
     print("Codename:", helpers.irecovery_info(irecovery, "MODEL"))
@@ -77,13 +85,18 @@ async def download_device_iboot(irecovery: str, output_path: pathlib.Path):
 
         board_version = helpers.irecovery_info(irecovery, "MODEL").lower()[:-2]
         iboot_zipf = f"Firmware/all_flash/iBoot.{board_version}.RELEASE.im4p"
+        iboot_zipf_alt = f"Firmware/all_flash/all_flash.{board_version}ap.production/iBoot.{board_version}.RELEASE.im4p"
 
         with remotezip.RemoteZip(ipsw_url) as zipf:
-            zipf.extract(iboot_zipf, enc_extract_dir)
+            try:
+                zipf.extract(iboot_zipf, enc_extract_dir)
+                enc_file = pathlib.Path(enc_extract_dir) / iboot_zipf
+            except KeyError:
+                iboot_alt = True
+                zipf.extract(iboot_zipf_alt, enc_extract_dir)
+                enc_file = pathlib.Path(enc_extract_dir) / iboot_zipf_alt
 
         # Decrypt the extracted file
-
-        enc_file = pathlib.Path(enc_extract_dir) / iboot_zipf
 
         iOS_build = ipsw_url.split("_")[-2]
 
@@ -115,19 +128,26 @@ class RebootTarget(IntEnum):
 
 
 async def func_reboot(
-    dev: usb.core.Device, irecovery: str, args: argparse.Namespace, target: RebootTarget
+    dev: usb.core.Device, irecovery: str, args: argparse.Namespace, target: RebootTarget, pwnmethod: PwnMethod,
 ) -> int:
     if args.iboot is not None:
         if args.iboot.is_dir():
             raise ValueError("iboot must be a file")
         if not args.iboot.exists():
             await download_device_iboot(irecovery, args.iboot)
-        usbliter8_boot(dev, args.iboot.read_bytes())
+        if pwnmethod == PwnMethod.USBLITER8:
+            usbliter8_boot(dev, args.iboot.read_bytes())
+        else:
+            # Checkm8
+            linux_remote_boot(args.iboot, None, args.remoteboot)
     else:
         with tempfile.TemporaryDirectory() as output_tempdir:
             output = pathlib.Path(output_tempdir) / "iboot.macho"
             await download_device_iboot(irecovery, output)
-            usbliter8_boot(dev, output.read_bytes())
+            if pwnmethod == PwnMethod.USBLITER8:
+                usbliter8_boot(dev, output.read_bytes())
+            else:
+                linux_remote_boot(output, None, args.remoteboot)
 
     print("Waiting for device to switch into recovery")
     await helpers.wait_disconnect(dev)
@@ -167,25 +187,25 @@ async def func_reboot(
 
 
 async def func_reboot_ios(
-    dev: usb.core.Device, irecovery: str, _pwned: bool, args: argparse.Namespace
+    dev: usb.core.Device, irecovery: str, pwned: PwnMethod, args: argparse.Namespace
 ) -> int:
-    return await func_reboot(dev, irecovery, args, RebootTarget.SYSTEM)
+    return await func_reboot(dev, irecovery, args, RebootTarget.SYSTEM, pwned)
 
 
 async def func_reboot_recovery(
-    dev: usb.core.Device, irecovery: str, _pwned: bool, args: argparse.Namespace
+    dev: usb.core.Device, irecovery: str, pwned: PwnMethod, args: argparse.Namespace
 ) -> int:
-    return await func_reboot(dev, irecovery, args, RebootTarget.RECOVERY)
+    return await func_reboot(dev, irecovery, args, RebootTarget.RECOVERY, pwned)
 
 
 async def func_reboot_dfu(
-    dev: usb.core.Device, irecovery: str, _pwned: bool, args: argparse.Namespace
+    dev: usb.core.Device, irecovery: str, pwned: PwnMethod, args: argparse.Namespace
 ) -> int:
-    return await func_reboot(dev, irecovery, args, RebootTarget.DFU)
+    return await func_reboot(dev, irecovery, args, RebootTarget.DFU, pwned)
 
 
 async def func_demote(
-    dev: usb.core.Device, irecovery: str, _pwned: bool, _args: argparse.Namespace
+    dev: usb.core.Device, irecovery: str, _pwned: PwnMethod, _args: argparse.Namespace
 ) -> int:
     ecid = helpers.irecovery_info(irecovery, "ECID")
     print(f"Telling device {ecid} to demote to development.")
@@ -196,7 +216,7 @@ async def func_demote(
 
 
 async def func_boot_raw(
-    dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace
+    dev: usb.core.Device, _irecovery: str, _pwned: PwnMethod, args: argparse.Namespace
 ) -> int:
     iboot_file = args.iboot
     print(f"Uploading {iboot_file} to device...")
@@ -206,7 +226,7 @@ async def func_boot_raw(
 
 
 async def func_boot_remote(
-    dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace
+    dev: usb.core.Device, _irecovery: str, _pwned: PwnMethod, args: argparse.Namespace
 ) -> int:
     linux_remote_boot(args.m1n1, args.monitor, args.remoteboot)
 
@@ -214,7 +234,7 @@ async def func_boot_remote(
 
 
 async def func_boot_linux(
-    dev: usb.core.Device, _irecovery: str, _pwned: bool, args: argparse.Namespace
+    dev: usb.core.Device, _irecovery: str, _pwned: PwnMethod, args: argparse.Namespace
 ) -> int:
     print("Preapring iboot...")
     with tempfile.NamedTemporaryFile(mode="wb") as m1n1_blob_file:
@@ -268,22 +288,36 @@ async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
         ) from e
 
     if helpers.serial_info_get(serial, "PWND") == "[usbliter8]":
-        pwned_device = True
+        pwned_device = PwnMethod.USBLITER8
+    elif can_checkm8(int(helpers.serial_info(serial, "CPID"), 16)):
+        pwned_device = PwnMethod.CHECKM8
     else:
-        pwned_device = False
+        pwned_device = PwnMethod.NONE
 
-    if pwned_device:
-        subparsers.add_parser(
-            "demote", help="Demote this device to a development device"
-        ).set_defaults(func=func_demote)
+    if pwned_device != PwnMethod.NONE:
+        if pwned_device == PwnMethod.USBLITER8:
+            # TODO: This using checkm8
+            subparsers.add_parser(
+                "demote", help="Demote this device to a development device"
+            ).set_defaults(func=func_demote)
 
         reboot_parser = subparsers.add_parser("reboot", help="Reboot device")
         reboot_parser.set_defaults(func=func_reboot_ios)
         reboot_parser.add_argument(
+            # TODO: Just use ~/.cache instead
             "--iboot",
             type=pathlib.Path,
             help="Path to an iboot file to save/load. If it does not exist, the needed file will be downloaded and moved there. If not specified, a temporary location will be used.",
         )
+
+        if pwned_device == PwnMethod.CHECKM8:
+            reboot_parser.add_argument(
+                "--remoteboot",
+                type=pathlib.Path,
+                help="Path to remoteboot.sh",
+                required=True,
+            )
+
         reboot_subcommands = reboot_parser.add_subparsers(help="Reboot mode")
 
         reboot_subcommands.add_parser("system", help="Reboot into iOS (default)")
@@ -299,13 +333,14 @@ async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
         )
         boot_subparsers = boot_parser.add_subparsers(dest="boot_action")
 
-        boot_raw_parser = boot_subparsers.add_parser(
-            "raw", help="Boot a raw iBoot file"
-        )
-        boot_raw_parser.add_argument(
-            "iboot", type=pathlib.Path, help="The raw iBoot to boot"
-        )
-        boot_raw_parser.set_defaults(func=func_boot_raw)
+        if pwned_device == PwnMethod.USBLITER8:
+            boot_raw_parser = boot_subparsers.add_parser(
+                "raw", help="Boot a raw iBoot file"
+            )
+            boot_raw_parser.add_argument(
+                "iboot", type=pathlib.Path, help="The raw iBoot to boot"
+            )
+            boot_raw_parser.set_defaults(func=func_boot_raw)
 
         boot_remote_parser = boot_subparsers.add_parser(
             "remote", help="Remote boot m1n1, linux, etc."
@@ -365,9 +400,6 @@ async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):
             required=True,
         )
         linux_parser.set_defaults(func=func_boot_linux)
-
-    if can_checkm8(int(helpers.serial_info(serial, "CPID"))):
-        subparsers.add_parser()
 
     args = parser.parse_args()
 
@@ -462,7 +494,7 @@ def linux_prep():
 
 async def run_subcommand(
     dev: usb.core.Device,
-    pwned: bool,
+    pwned: PwnMethod,
     serial: str,
     func: Callable,
     args: argparse.Namespace,

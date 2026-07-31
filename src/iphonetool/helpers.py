@@ -18,6 +18,7 @@ except ImportError:
         except ImportError:
             raise ImportError("Could not import needed modules")
 
+# TODO: Get cpu codes for A5-A7
 class AppleCPU(IntEnum):
     A8   = 0x7000
     A8X  = 0x7001
