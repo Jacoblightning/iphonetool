@@ -24,9 +24,6 @@ try:
 except ImportError:
     has_all_deps = False
 
-# Signature of subcommands: lockdown, dev
-
-
 async def func_info(_dev: usb.core.Device, lockdown) -> int:
     print(f"Detected normal mode {lockdown.display_name if lockdown.display_name is not None else 'unknown '+lockdown.device_class.value}:")
     print("iPhone ID:", lockdown.udid)
