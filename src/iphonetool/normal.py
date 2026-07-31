@@ -28,13 +28,15 @@ except ImportError:
 
 
 async def func_info(_dev: usb.core.Device, lockdown) -> int:
-    print(f"Detected normal mode {lockdown.display_name}:")
+    print(f"Detected normal mode {lockdown.display_name if lockdown.display_name is not None else 'unknown '+lockdown.device_class.value}:")
     print("iPhone ID:", lockdown.udid)
-    print("iPhone internal version:", lockdown.product_type)
+    print("iPhone internal version:", lockdown.product_type if lockdown.product_type is not None else (lockdown.all_values["ProductType"] if "ProductType" in lockdown.all_values else "unknown"))
     print("Device name:", lockdown.all_values["DeviceName"])
     print("iOS Version:", lockdown.product_version)
-    print("Codename:", lockdown.hardware_model.upper())
+    print("Codename:", lockdown.hardware_model.upper() if lockdown.hardware_model is not None else (lockdown.all_values["HardwareModel"].upper() if "HardwareModel" in lockdown.all_values else "unknown"))
     print("CPU:", lockdown.all_values["HardwarePlatform"].upper())
+    print("Password Protected:", "yes" if lockdown.all_values["PasswordProtected"] else "no")
+    print("Model Number:", lockdown.all_values["ModelNumber"])
 
     return 0
 
