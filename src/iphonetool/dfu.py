@@ -272,7 +272,7 @@ async def func_boot_linux(
 
 
 def can_checkm8(cpu: int) -> bool:
-    return cpu in (helpers.AppleCPU.A8, helpers.AppleCPU.A8X, helpers.AppleCPU.A9S, helpers.AppleCPU.A9T, helpers.AppleCPU.A9X, helpers.AppleCPU.A10, helpers.AppleCPU.A10X, helpers.AppleCPU.A11)
+    return cpu in (helpers.AppleCPU.A51, helpers.AppleCPU.A52, helpers.AppleCPU.A53, helpers.AppleCPU.A5X, helpers.AppleCPU.A6, helpers.AppleCPU.A6X, helpers.AppleCPU.A71, helpers.AppleCPU.A72, helpers.AppleCPU.A8, helpers.AppleCPU.A8X, helpers.AppleCPU.A9S, helpers.AppleCPU.A9T, helpers.AppleCPU.A9X, helpers.AppleCPU.A10, helpers.AppleCPU.A10X, helpers.AppleCPU.A11)
 
 
 async def main(dev: usb.core.Device, parser: argparse.ArgumentParser):

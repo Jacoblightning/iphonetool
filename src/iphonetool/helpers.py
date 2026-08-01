@@ -20,6 +20,14 @@ except ImportError:
 
 # TODO: Get cpu codes for A5-A7
 class AppleCPU(IntEnum):
+    A51  = 0x8940
+    A52  = 0x8942
+    A53  = 0x8947
+    A5X  = 0x8945
+    A6   = 0x8950
+    A6X  = 0x8955
+    A71  = 0x8960
+    A72  = 0x8965
     A8   = 0x7000
     A8X  = 0x7001
     A9S  = 0x8000
